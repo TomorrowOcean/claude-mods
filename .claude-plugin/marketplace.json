@@ -1,0 +1,16 @@
+{
+  "name": "tomorrowocean-mods",
+  "owner": {
+    "name": "TomorrowOcean"
+  },
+  "metadata": {
+    "description": "TomorrowOcean's Claude Code mods."
+  },
+  "plugins": [
+    {
+      "name": "next-steps",
+      "source": "./next-steps",
+      "description": "After each turn, suggests up to three next prompts in a question card, in the terminal and the desktop app."
+    }
+  ]
+}

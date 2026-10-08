@@ -1,0 +1,32 @@
+{
+  "name": "next-steps",
+  "version": "1.2.0",
+  "description": "After each turn, suggests up to three next prompts in a question card. Pick one (or type your own) and it becomes a draft to edit: in the terminal's prompt box, or in a field above the desktop app's.",
+  "author": {
+    "name": "Thariq Shihipar"
+  },
+  "license": "MIT",
+  "keywords": [
+    "suggestions",
+    "next-steps",
+    "prompt",
+    "function-hooks",
+    "ui"
+  ],
+  "userConfig": {
+    "minAnswerChars": {
+      "type": "number",
+      "title": "Shortest answer to suggest after",
+      "description": "Skip suggestions after answers shorter than this many characters.",
+      "required": false,
+      "default": 80
+    },
+    "suggestSkills": {
+      "type": "boolean",
+      "title": "Suggest skills and slash commands",
+      "description": "Tell the suggester which skills and slash commands this session has, so a suggestion can be one of them.",
+      "required": false,
+      "default": true
+    }
+  }
+}
