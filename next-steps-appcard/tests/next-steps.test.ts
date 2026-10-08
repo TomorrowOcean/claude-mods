@@ -2,7 +2,7 @@ import type { On, RenderSurface } from 'claude-code'
 import { expect, test } from 'claude-code/testing'
 
 const BAND = {
-  plugin: 'next-steps',
+  plugin: 'next-steps-appcard',
   component: 'AbovePrompt',
   props: {
     hasSurvey: false,
@@ -81,32 +81,40 @@ function world(on: On, { surface, hasBox }: World): Sent {
 // The fork runs detached from turn.complete: wait for the card it leads to.
 async function offered(ui: { find: (query: { key: string }) => Promise<unknown> }): Promise<void> {
   for (let tries = 0; tries < 200; tries++) {
-    if ((await ui.find({ key: 'pick1' })) !== undefined) return
+    if ((await ui.find({ key: 'toggle' })) !== undefined) return
   }
   throw new Error('the card never showed')
 }
 
+const EXPANDED = { options: { startCollapsed: false } }
+
 for (const surface of ['terminal', 'desktop'] as const) {
-  test(`${surface}: the card shows each suggestion over its prompt, and a pick fills the prompt box`, async ($, on) => {
+  test(`${surface}: the card starts as its title row, and expands to a pick that fills the prompt box`, async ($, on) => {
     const sent = world(on, { surface, hasBox: true })
     const ui = await $.ui.mount({ ...BAND, surface })
     expect(await ui.find({ type: 'Button' })).toBeUndefined()
 
     await $.turn.complete(TURN)
     await offered(ui)
-    // The card: its chip, its question, then label over prompt per suggestion.
-    // The command the session does not have is not offered.
+    // Collapsed: the title, the toggle and the close button, nothing to pick.
+    expect((await ui.findAll({ type: 'Text' })).map(text => text.text)).toEqual(['What next?'])
+    expect((await ui.findAll({ type: 'Button' })).map(button => button.key)).toEqual(['toggle', 'close'])
+
+    await ui.press({ key: 'toggle' })
+    // Expanded: label over prompt per suggestion. The command the session
+    // does not have is not offered.
     expect((await ui.findAll({ type: 'Text' })).map(text => text.text)).toEqual([
-      ' Next steps ',
       'What next?',
       'run the tests you just wrote',
       '/code-review high',
     ])
-    expect((await ui.findAll({ type: 'Button' })).map(button => button.props.label)).toEqual([
-      'Run the tests',
-      'Review the diff',
-      'dismiss',
+    expect((await ui.findAll({ type: 'Button' })).map(button => button.key)).toEqual([
+      'toggle',
+      'close',
+      'pick1',
+      'pick2',
     ])
+    expect((await ui.find({ key: 'pick1' }))?.props.label).toBe('Run the tests')
 
     await ui.press({ key: 'pick1' })
     expect(sent.fills).toEqual(['run the tests you just wrote'])
@@ -117,7 +125,39 @@ for (const surface of ['terminal', 'desktop'] as const) {
   })
 }
 
-test('with no prompt box to fill, a pick opens the prompt in the band, and only send submits it', async ($, on) => {
+test('the session keeps the last expand or collapse for its later cards', async ($, on) => {
+  world(on, { surface: 'desktop', hasBox: true })
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+
+  await $.turn.complete(TURN)
+  await offered(ui)
+  await ui.press({ key: 'toggle' })
+  expect(await ui.find({ key: 'pick1' })).toBeDefined()
+
+  // The next turn's card opens as the last one was left.
+  await $.turn.start({ turnId: 'turn-2' })
+  expect(await ui.find({ type: 'Button' })).toBeUndefined()
+  await $.turn.complete({ ...TURN, turnId: 'turn-2' })
+  await offered(ui)
+  expect(await ui.find({ key: 'pick1' })).toBeDefined()
+
+  await ui.press({ key: 'toggle' })
+  expect(await ui.find({ key: 'pick1' })).toBeUndefined()
+  expect(await ui.find({ key: 'toggle' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('startCollapsed off: the card opens expanded', EXPANDED, async ($, on) => {
+  world(on, { surface: 'desktop', hasBox: true })
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+
+  await $.turn.complete(TURN)
+  await offered(ui)
+  expect(await ui.find({ key: 'pick2' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('with no prompt box to fill, a pick opens the prompt in the band, and only send submits it', EXPANDED, async ($, on) => {
   const sent = world(on, { surface: 'desktop', hasBox: false })
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
 
@@ -142,7 +182,7 @@ test('with no prompt box to fill, a pick opens the prompt in the band, and only 
   await ui.unmount()
 })
 
-test('with no prompt box to fill, Enter in the field sends, and a slash prompt runs its command', async ($, on) => {
+test('with no prompt box to fill, Enter in the field sends, and a slash prompt runs its command', EXPANDED, async ($, on) => {
   const sent = world(on, { surface: 'desktop', hasBox: false })
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
 
@@ -155,7 +195,7 @@ test('with no prompt box to fill, Enter in the field sends, and a slash prompt r
   await ui.unmount()
 })
 
-test('a subagent turn, a short answer and a dismiss all leave the band empty', async ($, on) => {
+test('a subagent turn, a short answer and a close all leave the band empty', async ($, on) => {
   const sent = world(on, { surface: 'desktop', hasBox: true })
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
 
@@ -165,7 +205,7 @@ test('a subagent turn, a short answer and a dismiss all leave the band empty', a
 
   await $.turn.complete(TURN)
   await offered(ui)
-  await ui.press({ key: 'dismiss' })
+  await ui.press({ key: 'close' })
   expect(await ui.find({ type: 'Button' })).toBeUndefined()
   expect(await ui.find({ type: 'Text' })).toBeUndefined()
   expect(sent.forks).toBe(1)

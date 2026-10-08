@@ -8,9 +8,14 @@
   },
   "plugins": [
     {
-      "name": "next-steps",
-      "source": "./next-steps",
-      "description": "After each turn, suggests up to three next prompts in a card above the input, in the terminal and the desktop app."
+      "name": "next-steps-appcard",
+      "source": "./next-steps-appcard",
+      "description": "After each turn, suggests up to three next prompts in a collapsible card above the input. The turn ends as usual; ignore the card and type."
+    },
+    {
+      "name": "next-steps-askcard",
+      "source": "./next-steps-askcard",
+      "description": "As each turn ends, suggests up to three next prompts in the question card Claude asks with. The turn waits until you answer or close it."
     }
   ]
 }

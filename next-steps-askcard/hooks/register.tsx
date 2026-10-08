@@ -1,21 +1,32 @@
 /* @jsxRuntime classic */
 /* @jsx h */
 /* @jsxFrag Fragment */
-// next-steps: when a turn ends, fork the session (shares the prompt cache, so
+// next-steps-askcard: as a turn ends, fork the session (shares the prompt cache, so
 // it has full context for the price of one short reply) and ask for up to
-// three likely next prompts. Draw them in the band above the composer as a
-// card made to look like the engine's question card: a framed box, a header
-// chip, a question, and one option per suggestion, its label a button over
-// the full prompt. It is drawn here and is not that dialog ($.ui.ask): raised
-// outside a turn, the dialog reaches the desktop app as a tool's permission
-// request, and answering one leaves the app waiting on a turn that never ends.
-// A pick becomes a draft, never a sent prompt: the composer takes it
-// ($.prompt.fill) for the person to edit and Enter. Where the session binds no
-// composer a plugin can write, the band shows a field holding the text
-// instead, sent by Enter or the send button as the person's own words
+// three likely next prompts. Show them in the engine's own question card
+// ($.ui.ask, the dialog the model asks the person with): each suggestion an
+// option, the card's own free-text answer for a prompt of the person's. The
+// card takes labels alone, so a ui.render hook on it writes each option's
+// prompt under its label.
+// The card is raised while the turn is still stopping (classic.Stop, before
+// the stop goes on), never after it. The desktop app is handed the card as a
+// tool's permission request, and once one is answered it shows the session as
+// thinking until the turn finishes: raised after the turn there is no turn to
+// finish and the session stays shown as running. Raised here, the turn ends
+// once the person has answered.
+// A pick becomes a draft at the turn's end, never a sent prompt: the composer
+// takes it ($.prompt.fill) for the person to edit and Enter. Where the session
+// binds no composer a plugin can write, the band shows a field holding the
+// text instead, sent by Enter or the send button as the person's own words
 // ($.prompt.submit asUser, or $.command.run for a "/skill arguments" prompt).
-// Nothing is sent until the person sends it. The top suggestion is also the
-// composer's dim Tab-to-take ghost text ($.prompt.suggest).
+// Nothing is sent until the person sends it.
+// Where no card can be raised, the band above the composer draws one of its
+// own after the turn, as next-steps-appcard draws it: a framed box, a title
+// row with a collapse toggle and a close button, and a small framed card per
+// suggestion, its label a button over its prompt. It starts collapsed to its
+// title row (the `startCollapsed` option), and the session keeps the person's
+// last expand or collapse. The top suggestion is then also the composer's dim
+// Tab-to-take ghost text ($.prompt.suggest).
 // The fork is also handed the session's skills and slash commands
 // ($.command.list), so a suggestion can be "/skill arguments".
 
@@ -23,17 +34,36 @@ import type { CommandInfo, EngineInterface, Register, RenderElement } from 'clau
 
 type Suggestion = { label: string; prompt: string }
 
+// The engine's card is up, or its pick is on the way to the composer: the band
+// holds nothing of ours meanwhile.
+type Asking = { kind: 'asking'; items: Suggestion[] }
+type Drafting = { kind: 'drafting'; items: Suggestion[] }
+
 type Offer = { kind: 'offer'; items: Suggestion[] }
 
 type View =
   | { kind: 'hidden' }
-  | { kind: 'loading'; turnId: string }
+  | Asking
+  | Drafting
   | Offer
   | { kind: 'review'; items: Suggestion[]; draft: string }
 
-// The card's own words: the chip and the question over the options.
+// What a turn's card leaves for the turn's end: the person's pick, to become
+// the draft; or, no card having been raised, the suggestions for the band's.
+type Left = { items: Suggestion[]; pick?: string }
+
+// The card's own words: the chip and the question over the options. An
+// option's label is how its answer comes back, so labels are kept distinct.
 const CARD_HEADER = 'Next steps'
 const CARD_QUESTION = 'What next?'
+const CARD_PASS = 'Not now'
+// A card closed sooner than this was never the person's to close: there is no
+// dialog here, and the band draws the card instead.
+const CARD_MIN_SHOWN_MS = 400
+// The glyphs on the band card's two controls.
+const EXPAND_GLYPH = '▸'
+const COLLAPSE_GLYPH = '▾'
+const CLOSE_GLYPH = '✕'
 
 const MAX_SUGGESTIONS = 3
 const LABEL_MAX = 48
@@ -150,14 +180,23 @@ function parseSuggestions(reply: string, known: ReadonlySet<string> | null): Sug
     const filled = clean(prompt, PROMPT_MAX)
     if (filled === '' || !namesKnownCommand(filled, known)) continue
     const named = typeof label === 'string' ? clean(label, LABEL_MAX) : ''
-    items.push({ label: named === '' ? clean(filled, LABEL_MAX) : named, prompt: filled })
+    const shown = named === '' ? clean(filled, LABEL_MAX) : named
+    if (shown === CARD_PASS || items.some(item => item.label === shown)) continue
+    items.push({ label: shown, prompt: filled })
     if (items.length === MAX_SUGGESTIONS) break
   }
   return items
 }
 
-// Session-local view state; a hot reload resets it, which is fine.
+// Session-local state; a hot reload resets it, which is fine.
 let view: View = { kind: 'hidden' }
+let left: Left | null = null
+// One card a turn, however often the turn stops (a stop hook may send it on).
+let hasAsked = false
+let hasEnded = false
+// The person's last expand or collapse of the band's card, kept for the
+// session's later ones; unset until they press the toggle, and the option decides.
+let isCollapsedByPerson: boolean | undefined
 
 function show($: EngineInterface, nextView: View): void {
   view = nextView
@@ -170,7 +209,7 @@ function show($: EngineInterface, nextView: View): void {
 // shows it to edit and send instead: still the person's to send, and through
 // `prompt.submit`, where a hook that keeps prompts out still can.
 // A refusal in the terminal is only reported.
-async function draft($: EngineInterface, from: Offer, prompt: string): Promise<void> {
+async function draft($: EngineInterface, from: Drafting | Offer, prompt: string): Promise<void> {
   const filled = await $.prompt.fill({ text: prompt }).catch((error: unknown) => String(error))
   // A new turn took the suggestions down while the box was asked: leave it be.
   if (view !== from) return
@@ -186,6 +225,82 @@ async function draft($: EngineInterface, from: Offer, prompt: string): Promise<v
   show($, { kind: 'hidden' })
   if (typeof filled === 'string') $.ui.toast(`could not fill: ${filled}`)
   else if (!filled.isFilled) $.ui.toast('could not fill the prompt box')
+}
+
+// The turn's suggestions, from a fork of it; none when the fork gives none.
+async function suggest($: EngineInterface, suggestsSkills: boolean): Promise<Suggestion[]> {
+  try {
+    // Without the list the fork still suggests; slash prompts go unchecked.
+    const commands = await $.command.list().catch(() => null)
+    const known = commands === null ? null : new Set(commands.map(command => command.name))
+    const skills = suggestsSkills && commands !== null ? skillList(commands) : ''
+    const reply = await $.model.fork({ prompt: forkPrompt(skills) })
+    return reply.isAnswered ? parseSuggestions(reply.text, known) : []
+  } catch (error) {
+    $.ui.log(`fork failed: ${String(error)}`)
+    return []
+  }
+}
+
+// The card's options as the dialog draws them, each of ours with its prompt as
+// the description. Any other question passes as it came.
+function described(question: unknown, items: readonly Suggestion[]): unknown {
+  if (typeof question !== 'object' || question === null) return question
+  const asked = question as { question?: unknown; header?: unknown; options?: unknown }
+  if (asked.question !== CARD_QUESTION || asked.header !== CARD_HEADER) return question
+  if (!Array.isArray(asked.options)) return question
+  const options = asked.options.map((option: unknown) => {
+    if (typeof option !== 'object' || option === null) return option
+    const label = (option as { label?: unknown }).label
+    const item = items.find(candidate => candidate.label === label)
+    return item === undefined
+      ? option
+      : { ...option, description: clean(item.prompt, DESCRIPTION_MAX) }
+  })
+  return { ...asked, options }
+}
+
+// Raises the card and waits for its answer: the label picked, or the text
+// typed in place of one. Closed without an answer, nothing is left. One
+// rejection says both that the person closed the card and that none could be
+// raised (no dialog on this surface); only the first takes any time, and after
+// the second the suggestions are left for the band to draw.
+async function ask($: EngineInterface, items: Suggestion[]): Promise<Left | null> {
+  const asking: Asking = { kind: 'asking', items }
+  show($, asking)
+  const labels = items.map(item => item.label)
+  // The card takes two options at least.
+  if (labels.length === 1) labels.push(CARD_PASS)
+  const raisedAt = await $.clock.now()
+  try {
+    const answer = (await $.ui.ask(CARD_QUESTION, { options: labels, header: CARD_HEADER })).trim()
+    const pick = items.find(item => item.label === answer)?.prompt ?? answer
+    return pick === '' || pick === CARD_PASS ? null : { items, pick }
+  } catch (error) {
+    // An interrupted turn's clock may not answer: that card was shown.
+    const closedAt = await $.clock.now().catch(() => raisedAt + CARD_MIN_SHOWN_MS)
+    if (closedAt - raisedAt >= CARD_MIN_SHOWN_MS) return null
+    $.ui.log(`no question card, using the band: ${String(error)}`)
+    return { items }
+  } finally {
+    if (view === asking) show($, { kind: 'hidden' })
+  }
+}
+
+// The turn is over: what its card left goes where the person will use it.
+function deliver($: EngineInterface): void {
+  const leaving = left
+  left = null
+  if (leaving === null) return
+  if (leaving.pick !== undefined) {
+    const drafting: Drafting = { kind: 'drafting', items: leaving.items }
+    show($, drafting)
+    void draft($, drafting, leaving.pick)
+    return
+  }
+  show($, { kind: 'offer', items: leaving.items })
+  const top = leaving.items[0]
+  if (top !== undefined) void $.prompt.suggest({ text: top.prompt }).catch(() => undefined)
 }
 
 // The person's send from the band: the text as the field held it, read by the
@@ -211,63 +326,64 @@ async function send($: EngineInterface, text: string): Promise<void> {
 export const register: Register = (on, options) => {
   const minTurnChars = typeof options?.minAnswerChars === 'number' ? options.minAnswerChars : 80
   const suggestsSkills = options?.suggestSkills !== false
+  const startsCollapsed = options?.startCollapsed !== false
 
   // A new turn (typed or otherwise) hides whatever was offered.
   on('turn.start', async ($, e, next) => {
+    left = null
+    hasAsked = false
+    hasEnded = false
     if (view.kind !== 'hidden') show($, { kind: 'hidden' })
     return next(e)
   })
 
-  // Turn over: ask the fork, detached, so the turn's completion never waits on it.
+  // The main turn is stopping: fork and raise the card before the stop goes
+  // on, so the turn is still running while the card is up and ends once it is
+  // answered. A stop with background work in flight is a pause, not an end,
+  // and a subagent's stop is another event (SubagentStop).
+  on('classic.Stop', async ($, e, next) => {
+    const answer = e.last_assistant_message
+    const isPaused = (e.background_tasks?.length ?? 0) > 0
+    const isLongEnough = answer === undefined || answer.trim().length >= minTurnChars
+    if (!hasAsked && !isPaused && isLongEnough) {
+      hasAsked = true
+      const items = await suggest($, suggestsSkills)
+      if (items.length > 0) left = await ask($, items)
+    }
+    const result = await next(e)
+    // Where the turn's end was reported ahead of its stop, deliver from here.
+    if (hasEnded) deliver($)
+    return result
+    // Whatever goes wrong with the card, the turn still stops.
+  }).catch((_$, e, next) => next(e))
+
+  // Turn over: the pick becomes the draft, or the band draws the card.
   // A subagent's turn ends inside the person's own, which is not theirs to follow.
   on('turn.complete', async ($, e, next) => {
     const result = await next(e)
     if (e.agentId !== undefined) return result
-    if (e.reason !== 'answer' || e.answer.trim().length < minTurnChars) return result
-    const turnId = e.turnId
-    show($, { kind: 'loading', turnId })
-    void (async () => {
-      let items: Suggestion[] = []
-      try {
-        // Without the list the fork still suggests; slash prompts go unchecked.
-        const commands = await $.command.list().catch(() => null)
-        const known = commands === null ? null : new Set(commands.map(command => command.name))
-        const skills = suggestsSkills && commands !== null ? skillList(commands) : ''
-        const reply = await $.model.fork({ prompt: forkPrompt(skills) })
-        items = reply.isAnswered ? parseSuggestions(reply.text, known) : []
-      } catch (error) {
-        $.ui.log(`fork failed: ${String(error)}`)
-      }
-      // A newer turn started (or another completed) while we waited: drop ours.
-      if (view.kind !== 'loading' || view.turnId !== turnId) return
-      const top = items[0]
-      if (top === undefined) {
-        show($, { kind: 'hidden' })
-        return
-      }
-      show($, { kind: 'offer', items })
-      void $.prompt.suggest({ text: top.prompt }).catch(() => undefined)
-    })()
+    hasAsked = false
+    hasEnded = true
+    if (e.reason === 'answer') deliver($)
+    else left = null
     return result
+  })
+
+  // The card while it is ours: each option's prompt goes under its label.
+  on('ui.render', { component: 'AskUserQuestion' }, ($, e, next) => {
+    if (view.kind !== 'asking') return next(e)
+    const items = view.items
+    const questions = e.props.questions.map(question => described(question, items))
+    return next({ ...e, props: { ...e.props, questions } })
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next): Promise<RenderElement> => {
     const below = await next(e)
     if (e.props.hasSurvey || e.props.isWorking || view.kind === 'hidden') return below
+    if (view.kind === 'asking' || view.kind === 'drafting') return below
     // The band is the terminal's and the desktop app's; both draw a field.
     if (e.surface !== 'terminal' && e.surface !== 'desktop') return below
     const { Box, Text, Button, Input } = $.ui.resolve(e)
-
-    if (view.kind === 'loading') {
-      return (
-        <Box flexDirection="column">
-          {below}
-          <Box marginTop={1}>
-            <Text dimColor>Next steps…</Text>
-          </Box>
-        </Box>
-      )
-    }
 
     if (view.kind === 'review') {
       const review = view
@@ -301,38 +417,54 @@ export const register: Register = (on, options) => {
     }
 
     const offer = view
+    const isCollapsed = isCollapsedByPerson ?? startsCollapsed
     return (
       <Box flexDirection="column">
         {below}
         <Box marginTop={1} flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
           <Box columnGap={1}>
-            <Text inverse bold>{` ${CARD_HEADER} `}</Text>
             <Text bold>{CARD_QUESTION}</Text>
-          </Box>
-          {offer.items.map((item, index) => (
-            <Box key={`s${index}`} flexDirection="column" marginTop={1}>
-              <Button
-                key={`pick${index + 1}`}
-                hotkey={String(index + 1)}
-                plain
-                label={item.label}
-                onPress={() => void draft($, offer, item.prompt)}
-              />
-              <Box marginLeft={3}>
-                <Text dimColor>{clean(item.prompt, DESCRIPTION_MAX)}</Text>
-              </Box>
-            </Box>
-          ))}
-          <Box marginTop={1}>
+            <Box flexGrow={1} />
             <Button
-              key="dismiss"
-              hotkey="0"
+              key="toggle"
+              plain
+              label={isCollapsed ? EXPAND_GLYPH : COLLAPSE_GLYPH}
+              onPress={() => {
+                isCollapsedByPerson = !isCollapsed
+                $.ui.invalidate('ui.render')
+              }}
+            />
+            <Button
+              key="close"
               plain
               role="dismiss"
-              label="dismiss"
+              label={CLOSE_GLYPH}
               onPress={() => show($, { kind: 'hidden' })}
             />
           </Box>
+          {isCollapsed
+            ? null
+            : offer.items.map((item, index) => (
+                <Box
+                  key={`s${index}`}
+                  flexDirection="column"
+                  borderStyle="round"
+                  borderDimColor
+                  hover={{ borderDimColor: false }}
+                  paddingX={1}
+                >
+                  <Button
+                    key={`pick${index + 1}`}
+                    hotkey={String(index + 1)}
+                    plain
+                    label={item.label}
+                    onPress={() => void draft($, offer, item.prompt)}
+                  />
+                  <Box marginLeft={3}>
+                    <Text dimColor>{clean(item.prompt, DESCRIPTION_MAX)}</Text>
+                  </Box>
+                </Box>
+              ))}
         </Box>
       </Box>
     )
