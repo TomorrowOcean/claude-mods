@@ -5,16 +5,14 @@ After each turn, suggests up to three next prompts in a card above the input box
 Its sibling [next-steps-askcard](../next-steps-askcard/README.md) shows the same suggestions in the card Claude asks you questions with, and holds the turn open until you answer. Install one of the two, not both.
 
 ```
+What next?                          ▾ ✕
 ╭──────────────────────────────────────╮
-│ What next?                      ▾ ✕  │
-│ ╭──────────────────────────────────╮ │
-│ │ 1: Run the tests                 │ │
-│ │    run the tests you just wrote  │ │
-│ ╰──────────────────────────────────╯ │
-│ ╭──────────────────────────────────╮ │
-│ │ 2: Review the diff               │ │
-│ │    /code-review high             │ │
-│ ╰──────────────────────────────────╯ │
+│ 1: Run the tests                     │
+│ run the tests you just wrote         │
+╰──────────────────────────────────────╯
+╭──────────────────────────────────────╮
+│ 2: Review the diff                   │
+│ /code-review high                    │
 ╰──────────────────────────────────────╯
 ```
 
@@ -23,12 +21,12 @@ Each small card is one suggestion: a short label you click (or press `1`, `2`, `
 The card starts collapsed to its title row:
 
 ```
-╭──────────────────────────────────────╮
-│ What next?                      ▸ ✕  │
-╰──────────────────────────────────────╯
+What next?                          ▸ ✕
 ```
 
 `▸` expands it and `▾` collapses it. Once you press either, later cards in the same session open the way you left the last one. A new session goes back to the `startCollapsed` option.
+
+The app gives the area above the input box a fixed number of rows (12 in the desktop app) and scrolls what does not fit. To leave as many of them as it can to the prompts, the card has no frame around the whole and no blank rows between the small cards. Three suggestions still come to 13 rows, more when a long prompt wraps, so an expanded card of three scrolls a little.
 
 The card is designed for the desktop app. It should work in the terminal too, but it has not been specially tested there.
 

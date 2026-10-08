@@ -1,6 +1,6 @@
 {
   "name": "next-steps-askcard",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "As each turn ends, suggests up to three next prompts in the question card. Pick one (or type your own) and it lands in the input box as a draft you can edit. The turn waits for the card, so it ends once you answer or close it.",
   "author": {
     "name": "Thariq Shihipar"

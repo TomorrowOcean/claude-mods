@@ -4,10 +4,13 @@
 // next-steps-appcard: when a turn ends, fork the session (shares the prompt cache, so
 // it has full context for the price of one short reply) and ask for up to
 // three likely next prompts. Draw them in the band above the composer as a
-// card: a framed box, a title row with a collapse toggle and a close button,
-// and a small framed card per suggestion, its label a button over the full
-// prompt. The card starts collapsed to its title row (the `startCollapsed`
-// option), and the session keeps the person's last expand or collapse. It is
+// card: a title row with a collapse toggle and a close button, over a small
+// framed card per suggestion, its label a button over the full prompt. The
+// whole has no frame of its own and no blank rows: the band scrolls a tree
+// taller than the rows it is given (12 in the desktop app), and every row
+// spent on chrome is one a wrapped prompt cannot use. The card starts
+// collapsed to its title row (the `startCollapsed` option), and the session
+// keeps the person's last expand or collapse. It is
 // drawn here and is not the engine's question dialog ($.ui.ask): raised
 // outside a turn, the dialog reaches the desktop app as a tool's permission
 // request, and answering one leaves the app waiting on a turn that never ends.
@@ -313,7 +316,7 @@ export const register: Register = (on, options) => {
     return (
       <Box flexDirection="column">
         {below}
-        <Box marginTop={1} flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
+        <Box flexDirection="column">
           <Box columnGap={1}>
             <Text bold>{CARD_TITLE}</Text>
             <Box flexGrow={1} />
@@ -352,9 +355,7 @@ export const register: Register = (on, options) => {
                     label={item.label}
                     onPress={() => void draft($, offer, item.prompt)}
                   />
-                  <Box marginLeft={3}>
-                    <Text dimColor>{clean(item.prompt, DESCRIPTION_MAX)}</Text>
-                  </Box>
+                  <Text dimColor>{clean(item.prompt, DESCRIPTION_MAX)}</Text>
                 </Box>
               ))}
         </Box>

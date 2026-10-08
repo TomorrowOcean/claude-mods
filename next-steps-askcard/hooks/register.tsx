@@ -21,9 +21,11 @@
 // ($.prompt.submit asUser, or $.command.run for a "/skill arguments" prompt).
 // Nothing is sent until the person sends it.
 // Where no card can be raised, the band above the composer draws one of its
-// own after the turn, as next-steps-appcard draws it: a framed box, a title
-// row with a collapse toggle and a close button, and a small framed card per
-// suggestion, its label a button over its prompt. It starts collapsed to its
+// own after the turn, as next-steps-appcard draws it: a title row with a
+// collapse toggle and a close button, over a small framed card per
+// suggestion, its label a button over its prompt, with no frame around the
+// whole and no blank rows (the band scrolls a tree taller than the rows it is
+// given, 12 in the desktop app). It starts collapsed to its
 // title row (the `startCollapsed` option), and the session keeps the person's
 // last expand or collapse. The top suggestion is then also the composer's dim
 // Tab-to-take ghost text ($.prompt.suggest).
@@ -421,7 +423,7 @@ export const register: Register = (on, options) => {
     return (
       <Box flexDirection="column">
         {below}
-        <Box marginTop={1} flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
+        <Box flexDirection="column">
           <Box columnGap={1}>
             <Text bold>{CARD_QUESTION}</Text>
             <Box flexGrow={1} />
@@ -460,9 +462,7 @@ export const register: Register = (on, options) => {
                     label={item.label}
                     onPress={() => void draft($, offer, item.prompt)}
                   />
-                  <Box marginLeft={3}>
-                    <Text dimColor>{clean(item.prompt, DESCRIPTION_MAX)}</Text>
-                  </Box>
+                  <Text dimColor>{clean(item.prompt, DESCRIPTION_MAX)}</Text>
                 </Box>
               ))}
         </Box>

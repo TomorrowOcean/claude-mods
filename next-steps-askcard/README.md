@@ -41,16 +41,14 @@ Where a session has no input box a plugin can write, the draft opens in a field 
 After the turn the suggestions are drawn as a card above the input box, the one next-steps-appcard draws, and the transcript says so in one dim line:
 
 ```
+What next?                          ▾ ✕
 ╭──────────────────────────────────────╮
-│ What next?                      ▾ ✕  │
-│ ╭──────────────────────────────────╮ │
-│ │ 1: Run the tests                 │ │
-│ │    run the tests you just wrote  │ │
-│ ╰──────────────────────────────────╯ │
-│ ╭──────────────────────────────────╮ │
-│ │ 2: Review the diff               │ │
-│ │    /code-review high             │ │
-│ ╰──────────────────────────────────╯ │
+│ 1: Run the tests                     │
+│ run the tests you just wrote         │
+╰──────────────────────────────────────╯
+╭──────────────────────────────────────╮
+│ 2: Review the diff                   │
+│ /code-review high                    │
 ╰──────────────────────────────────────╯
 ```
 

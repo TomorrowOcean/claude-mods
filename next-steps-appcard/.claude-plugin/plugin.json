@@ -1,6 +1,6 @@
 {
   "name": "next-steps-appcard",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "After each turn, suggests up to three next prompts in a card above the input: a What next? title row with a collapse toggle and a close button, and a small card per suggestion. Click a suggestion's label to put its prompt in the input box as a draft you can edit. Starts collapsed.",
   "author": {
     "name": "Thariq Shihipar"

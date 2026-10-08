@@ -33,47 +33,26 @@ next-steps-askcard 在叫不出原生卡片的環境會改畫 next-steps-appcard
 
 ## 安裝
 
-在終端機先加入 marketplace：
+以下以 Claude 桌面版 App 為例，直接請 Claude 幫你裝。請先把 App 更新到最新版，這兩個 mod 需要較新的版本才能載入。
 
-```bash
-claude plugin marketplace add TomorrowOcean/claude-mods
+1. 用上面的比較表選好要裝哪一個，複製它的資料夾連結：
+   - next-steps-appcard：`https://github.com/TomorrowOcean/claude-mods/tree/main/next-steps-appcard`
+   - next-steps-askcard：`https://github.com/TomorrowOcean/claude-mods/tree/main/next-steps-askcard`
+2. 打開桌面版 App 的 Code 分頁，開一個新對話，選哪個資料夾都可以。
+3. 貼上下面的提示詞，把最後一行換成你選的連結，然後送出。
+4. Claude 執行安裝指令前會請你確認，按允許。
+5. 裝好之後再開一個新對話，mod 從新對話開始生效。
+
+提示詞參考：
+
+```text
+幫我安裝這個 Claude Code mod：
+https://github.com/TomorrowOcean/claude-mods/tree/main/next-steps-appcard
 ```
 
-再安裝其中一個：
+怎麼確認有生效：在新對話裡等 Claude 回覆完一則較長的訊息。裝 next-steps-appcard 的話，輸入框上方會出現一列 `What next?`，點 `▸` 展開；裝 next-steps-askcard 的話，回覆結束時會跳出提問卡片。
 
-```bash
-claude plugin install next-steps-appcard@tomorrowocean-mods
-```
-
-```bash
-claude plugin install next-steps-askcard@tomorrowocean-mods
-```
-
-也可以在 Claude Code 裡用 `/plugin marketplace add TomorrowOcean/claude-mods`，再從 `/plugin` 選單安裝。
-
-兩個都是 function-hooks plugin，需要支援 function hooks 的較新版 Claude Code。
-
-## 從 next-steps 換過來
-
-原本的 `next-steps` 已改名為 `next-steps-appcard`，舊名稱不會再收到更新。先移除舊的，再照上面安裝新的：
-
-```bash
-claude plugin uninstall next-steps@tomorrowocean-mods
-```
-
-## 更新
-
-```bash
-claude plugin marketplace update tomorrowocean-mods
-```
-
-```bash
-claude plugin update next-steps-appcard@tomorrowocean-mods
-```
-
-```bash
-claude plugin update next-steps-askcard@tomorrowocean-mods
-```
+之後想換成另一個，請 Claude 先移除目前這個，再照同樣的方式安裝另一個。
 
 ## 授權
 
