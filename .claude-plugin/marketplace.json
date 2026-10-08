@@ -10,7 +10,7 @@
     {
       "name": "next-steps",
       "source": "./next-steps",
-      "description": "After each turn, suggests up to three next prompts in a question card, in the terminal and the desktop app."
+      "description": "After each turn, suggests up to three next prompts in a card above the input, in the terminal and the desktop app."
     }
   ]
 }

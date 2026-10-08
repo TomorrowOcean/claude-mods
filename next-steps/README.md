@@ -1,41 +1,36 @@
 # next-steps
 
-After each turn, suggests up to three next prompts in a question card, the same card Claude asks you questions with.
+After each turn, suggests up to three next prompts in a card above the input box. The card is drawn to look like the one Claude asks you questions with.
 
 ```
-Next steps   What next?
-
-  Run the tests
-  run the tests you just wrote
-
-  Review the diff
-  /code-review high
-
-  Other…
+╭──────────────────────────────────────╮
+│  Next steps  What next?              │
+│                                      │
+│ 1: Run the tests                     │
+│    run the tests you just wrote      │
+│                                      │
+│ 2: Review the diff                   │
+│    /code-review high                 │
+│                                      │
+│ 0: dismiss                           │
+╰──────────────────────────────────────╯
 ```
 
-Each option is one suggestion: a short label over the full prompt. Pick one, or type your own under Other. Closing the card drops the suggestions.
+Each option is one suggestion: a short label you click (or press `1`, `2`, `3` in the terminal) over the prompt it stands for. `0` or the close mark dismisses the card. It sits above the input box and takes nothing over: ignore it and type as usual.
 
-This copy is [next-steps](https://github.com/anthropics/claude-plugins-community/tree/main/next-steps) 1.0.0 by Thariq Shihipar (MIT), changed to show the suggestions in the card and to work in the desktop app. The upstream version draws buttons above the prompt box and fills the terminal's prompt box, which the desktop app does not have.
+This copy is [next-steps](https://github.com/anthropics/claude-plugins-community/tree/main/next-steps) 1.0.0 by Thariq Shihipar (MIT), with the card look, the prompt shown under each label, and a subagent's turn skipped.
 
 ## After you pick
 
-The pick becomes a draft. It is never sent as picked.
+The prompt is written into the input box as a draft, in the terminal and in the desktop app. Edit it, then send it yourself. The plugin never sends a prompt on its own.
 
-- **In the terminal** it is written into the prompt box. Edit it, then press Enter yourself. The top suggestion also shows as the box's dim ghost text, so Tab takes it.
-- **In the desktop app** the prompt box is the app's own, which a plugin cannot write, so the draft opens in a field above it:
+In the terminal the top suggestion also shows as the box's dim ghost text, so Tab takes it.
 
-  ```
-  Next (edit, then send):
-    [ run the tests you just wrote          ]
-    [ send ]  [ back ]
-  ```
+Where a session has no input box a plugin can write, the draft opens in a field above it instead, with `send` and `back`.
 
-  Edit it there, then press Enter in the field or click `send`. `back` raises the card again. A prompt that starts with a skill or slash command the session has (`/code-review high`) runs that command.
+## Why it is not the real question card
 
-## Where no card can be raised
-
-The suggestions fall back to buttons above the prompt box (`1`, `2`, `3`, and `0` or the close mark to dismiss), and the transcript says so in one dim line.
+The engine has a call that raises the real card (`$.ui.ask`), and version 1.2.0 used it. The desktop app treats that card as a question asked in the middle of a turn: once it is answered the app shows the session as thinking and waits for the turn to finish. Raised after a turn, there is no turn to finish, so the session stays shown as running until the next message. Drawing the card here avoids that.
 
 ## How it works
 
@@ -43,9 +38,10 @@ It is a function-hooks plugin (`hooks/register.tsx`):
 
 - `turn.complete`: forks the session with `$.model.fork` to ask for likely next prompts. The fork shares the session's prompt cache, so it costs about one short reply. A subagent's turn is skipped.
 - `$.command.list`: the session's skills and slash commands (plugin, user and MCP ones with their descriptions) go into the fork's question, so a suggestion can be `/skill arguments`. A suggestion that names a command the session does not have is dropped.
-- `$.ui.ask`: raises the card with the suggestions' labels. A plugin may not call the AskUserQuestion tool itself, and `$.ui.ask` takes labels alone, so a `ui.render` hook on `AskUserQuestion` adds each option's full prompt as its description.
-- The answer goes to `$.prompt.fill`. Where that is refused for want of a prompt box, a `ui.render` hook on `AbovePrompt` draws an `Input` with the draft; its send calls `$.prompt.submit` with `asUser`, or `$.command.run` for a known command.
-- `turn.start`: takes the suggestions down.
+- `ui.render` on `AbovePrompt`: draws the card, on the terminal and the desktop app.
+- A press calls `$.prompt.fill`; the top suggestion goes to `$.prompt.suggest`.
+- Where the fill is refused for want of an input box, the band draws an `Input` with the prompt. Its send calls `$.prompt.submit` with `asUser`, or `$.command.run` for a known command.
+- `turn.start`: takes the card down.
 
 ## Options
 

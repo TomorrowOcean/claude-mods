@@ -3,20 +3,19 @@
 /* @jsxFrag Fragment */
 // next-steps: when a turn ends, fork the session (shares the prompt cache, so
 // it has full context for the price of one short reply) and ask for up to
-// three likely next prompts. Show them in the engine's own question card
-// ($.ui.ask, the dialog the model asks the person with): each suggestion an
-// option, the card's own free-text answer for a prompt of the person's. The
-// card takes labels alone, so a ui.render hook on it writes each option's full
-// prompt under its label.
-// The answer becomes a draft, never a sent prompt. The terminal's composer
-// takes it ($.prompt.fill) for the person to edit and Enter. The desktop app
-// draws its own composer, which no plugin can write, so there the band above
-// it shows a field holding the text to edit, sent by Enter or the send button
-// as the person's own words ($.prompt.submit asUser, or $.command.run for a
-// "/skill arguments" prompt). Nothing is sent until the person sends it.
-// Where the card cannot be raised the band offers the suggestions itself, as
-// 1/2/3 buttons. The top suggestion is also the composer's dim Tab-to-take
-// ghost text ($.prompt.suggest).
+// three likely next prompts. Draw them in the band above the composer as a
+// card made to look like the engine's question card: a framed box, a header
+// chip, a question, and one option per suggestion, its label a button over
+// the full prompt. It is drawn here and is not that dialog ($.ui.ask): raised
+// outside a turn, the dialog reaches the desktop app as a tool's permission
+// request, and answering one leaves the app waiting on a turn that never ends.
+// A pick becomes a draft, never a sent prompt: the composer takes it
+// ($.prompt.fill) for the person to edit and Enter. Where the session binds no
+// composer a plugin can write, the band shows a field holding the text
+// instead, sent by Enter or the send button as the person's own words
+// ($.prompt.submit asUser, or $.command.run for a "/skill arguments" prompt).
+// Nothing is sent until the person sends it. The top suggestion is also the
+// composer's dim Tab-to-take ghost text ($.prompt.suggest).
 // The fork is also handed the session's skills and slash commands
 // ($.command.list), so a suggestion can be "/skill arguments".
 
@@ -24,29 +23,23 @@ import type { CommandInfo, EngineInterface, Register, RenderElement } from 'clau
 
 type Suggestion = { label: string; prompt: string }
 
-type Asking = { kind: 'asking'; items: Suggestion[] }
-
 type Offer = { kind: 'offer'; items: Suggestion[] }
 
 type View =
   | { kind: 'hidden' }
   | { kind: 'loading'; turnId: string }
-  | Asking
   | Offer
   | { kind: 'review'; items: Suggestion[]; draft: string }
 
-// The card: one question, the suggestions its options. An option's label is
-// how its answer comes back, so labels are kept distinct.
-const CARD_QUESTION = 'What next?'
+// The card's own words: the chip and the question over the options.
 const CARD_HEADER = 'Next steps'
-const CARD_PASS = 'Not now'
-// A card closed sooner than this was never the person's to close: there is no
-// dialog here, and the band offers the suggestions instead.
-const CARD_MIN_SHOWN_MS = 400
+const CARD_QUESTION = 'What next?'
 
 const MAX_SUGGESTIONS = 3
 const LABEL_MAX = 48
 const PROMPT_MAX = 600
+// How much of a prompt the card shows under its label; the draft has it all.
+const DESCRIPTION_MAX = 200
 const SKILL_NAME_MAX = 64
 const SKILL_DESCRIPTION_MAX = 120
 const SKILLS_DESCRIBED_BUDGET = 6000
@@ -65,7 +58,7 @@ const ESCAPE_SEQUENCES =
   /\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-Z\\-_]/g
 const TAG_CHARACTERS = /[\u{E0000}-\u{E007F}]/u
 const UNSEEN_CHARACTERS =
-  /[\p{Cc}\p{Cf}\p{Cn}\p{Co}\p{Cs}\p{Variation_Selector}ᅟᅠㅤﾠ]/gu
+  /[\p{Cc}\p{Cf}\p{Cn}\p{Co}\p{Cs}\p{Variation_Selector}\u115f\u1160\u3164\uffa0]/gu
 const COMBINING_RUN = /(\p{M}{3})\p{M}+/gu
 
 function clean(text: string, max: number): string {
@@ -157,9 +150,7 @@ function parseSuggestions(reply: string, known: ReadonlySet<string> | null): Sug
     const filled = clean(prompt, PROMPT_MAX)
     if (filled === '' || !namesKnownCommand(filled, known)) continue
     const named = typeof label === 'string' ? clean(label, LABEL_MAX) : ''
-    const shown = named === '' ? clean(filled, LABEL_MAX) : named
-    if (shown === CARD_PASS || items.some(item => item.label === shown)) continue
-    items.push({ label: shown, prompt: filled })
+    items.push({ label: named === '' ? clean(filled, LABEL_MAX) : named, prompt: filled })
     if (items.length === MAX_SUGGESTIONS) break
   }
   return items
@@ -175,11 +166,11 @@ function show($: EngineInterface, nextView: View): void {
 
 // A suggestion the person chose: the prompt box takes it as their draft.
 // Where the session binds no box (`no_composer`), or draws on no terminal
-// (the desktop app, whose composer is its own) and the box did not take it,
-// the band shows it to edit and send instead: still the person's to send, and
-// through `prompt.submit`, where a hook that keeps prompts out still can.
+// (a surface whose composer is its own) and the box did not take it, the band
+// shows it to edit and send instead: still the person's to send, and through
+// `prompt.submit`, where a hook that keeps prompts out still can.
 // A refusal in the terminal is only reported.
-async function draft($: EngineInterface, from: Asking | Offer, prompt: string): Promise<void> {
+async function draft($: EngineInterface, from: Offer, prompt: string): Promise<void> {
   const filled = await $.prompt.fill({ text: prompt }).catch((error: unknown) => String(error))
   // A new turn took the suggestions down while the box was asked: leave it be.
   if (view !== from) return
@@ -195,57 +186,6 @@ async function draft($: EngineInterface, from: Asking | Offer, prompt: string): 
   show($, { kind: 'hidden' })
   if (typeof filled === 'string') $.ui.toast(`could not fill: ${filled}`)
   else if (!filled.isFilled) $.ui.toast('could not fill the prompt box')
-}
-
-// The card's options as the dialog draws them, each of ours with its full
-// prompt as the description. Any other question passes as it came.
-function described(question: unknown, items: readonly Suggestion[]): unknown {
-  if (typeof question !== 'object' || question === null) return question
-  const asked = question as { question?: unknown; header?: unknown; options?: unknown }
-  if (asked.question !== CARD_QUESTION || asked.header !== CARD_HEADER) return question
-  if (!Array.isArray(asked.options)) return question
-  const options = asked.options.map((option: unknown) => {
-    if (typeof option !== 'object' || option === null) return option
-    const label = (option as { label?: unknown }).label
-    const item = items.find(candidate => candidate.label === label)
-    return item === undefined ? option : { ...option, description: item.prompt }
-  })
-  return { ...asked, options }
-}
-
-// Raises the card and takes its answer on as a draft: the label picked, or the
-// text typed in place of one. Closed without an answer, the suggestions go.
-// One rejection says both that the person closed the card and that none could
-// be raised (no dialog on this surface); only the first takes any time, and
-// after the second the band offers the suggestions instead.
-async function ask($: EngineInterface, items: Suggestion[]): Promise<void> {
-  const asking: Asking = { kind: 'asking', items }
-  show($, asking)
-  const labels = items.map(item => item.label)
-  // The card takes two options at least.
-  if (labels.length === 1) labels.push(CARD_PASS)
-  const raisedAt = await $.clock.now()
-  let answer: string
-  try {
-    answer = (await $.ui.ask(CARD_QUESTION, { options: labels, header: CARD_HEADER })).trim()
-  } catch (error) {
-    const wasShown = (await $.clock.now()) - raisedAt >= CARD_MIN_SHOWN_MS
-    if (view !== asking) return
-    if (wasShown) {
-      show($, { kind: 'hidden' })
-      return
-    }
-    show($, { kind: 'offer', items })
-    $.ui.log(`no question card, using the band: ${String(error)}`)
-    return
-  }
-  if (view !== asking) return
-  const prompt = items.find(item => item.label === answer)?.prompt ?? answer
-  if (prompt === '' || prompt === CARD_PASS) {
-    show($, { kind: 'hidden' })
-    return
-  }
-  await draft($, asking, prompt)
 }
 
 // The person's send from the band: the text as the field held it, read by the
@@ -305,25 +245,15 @@ export const register: Register = (on, options) => {
         show($, { kind: 'hidden' })
         return
       }
+      show($, { kind: 'offer', items })
       void $.prompt.suggest({ text: top.prompt }).catch(() => undefined)
-      await ask($, items)
     })()
     return result
-  })
-
-  // The card while it is ours: each option's full prompt goes under its label.
-  on('ui.render', { component: 'AskUserQuestion' }, ($, e, next) => {
-    if (view.kind !== 'asking') return next(e)
-    const items = view.items
-    const questions = e.props.questions.map(question => described(question, items))
-    return next({ ...e, props: { ...e.props, questions } })
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next): Promise<RenderElement> => {
     const below = await next(e)
     if (e.props.hasSurvey || e.props.isWorking || view.kind === 'hidden') return below
-    // The card is the engine's own dialog: the band stays clear beneath it.
-    if (view.kind === 'asking') return below
     // The band is the terminal's and the desktop app's; both draw a field.
     if (e.surface !== 'terminal' && e.surface !== 'desktop') return below
     const { Box, Text, Button, Input } = $.ui.resolve(e)
@@ -363,7 +293,7 @@ export const register: Register = (on, options) => {
             <Button
               key="back"
               label="back"
-              onPress={() => void ask($, review.items)}
+              onPress={() => show($, { kind: 'offer', items: review.items })}
             />
           </Box>
         </Box>
@@ -374,28 +304,35 @@ export const register: Register = (on, options) => {
     return (
       <Box flexDirection="column">
         {below}
-        <Box marginTop={1} />
-        <Text dimColor>Next:</Text>
-        {offer.items.map((item, index) => (
-          <Box key={`s${index}`} marginLeft={2}>
+        <Box marginTop={1} flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
+          <Box columnGap={1}>
+            <Text inverse bold>{` ${CARD_HEADER} `}</Text>
+            <Text bold>{CARD_QUESTION}</Text>
+          </Box>
+          {offer.items.map((item, index) => (
+            <Box key={`s${index}`} flexDirection="column" marginTop={1}>
+              <Button
+                key={`pick${index + 1}`}
+                hotkey={String(index + 1)}
+                plain
+                label={item.label}
+                onPress={() => void draft($, offer, item.prompt)}
+              />
+              <Box marginLeft={3}>
+                <Text dimColor>{clean(item.prompt, DESCRIPTION_MAX)}</Text>
+              </Box>
+            </Box>
+          ))}
+          <Box marginTop={1}>
             <Button
-              key={`pick${index + 1}`}
-              hotkey={String(index + 1)}
+              key="dismiss"
+              hotkey="0"
               plain
-              label={item.label}
-              onPress={() => void draft($, offer, item.prompt)}
+              role="dismiss"
+              label="dismiss"
+              onPress={() => show($, { kind: 'hidden' })}
             />
           </Box>
-        ))}
-        <Box marginLeft={2}>
-          <Button
-            key="dismiss"
-            hotkey="0"
-            plain
-            role="dismiss"
-            label="dismiss"
-            onPress={() => show($, { kind: 'hidden' })}
-          />
         </Box>
       </Box>
     )

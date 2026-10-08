@@ -6,7 +6,7 @@
 
 | Mod | 說明 |
 | --- | --- |
-| [next-steps](next-steps/README.md) | 每一輪回覆結束後，用提問卡片建議最多三個下一步 prompt。選一個（或自己輸入）會變成可編輯的草稿，終端機和桌面 app 都能用。 |
+| [next-steps](next-steps/README.md) | 每一輪回覆結束後，在輸入框上方用一張仿提問卡片的卡片建議最多三個下一步 prompt。點一個（終端機可按 1、2、3）會寫進輸入框成為可編輯的草稿，終端機和桌面 app 都能用。 |
 
 ## 安裝
 
@@ -38,4 +38,4 @@ claude plugin update next-steps@tomorrowocean-mods
 
 MIT，見 [LICENSE](LICENSE)。
 
-next-steps 改自 Thariq Shihipar 的 [next-steps](https://github.com/anthropics/claude-plugins-community/tree/main/next-steps) 1.0.0（MIT）。原版在輸入框上方畫按鈕並寫入終端機的輸入框；這份改成把建議顯示在提問卡片裡，並且能在沒有該輸入框的桌面 app 中使用。
+next-steps 改自 Thariq Shihipar 的 [next-steps](https://github.com/anthropics/claude-plugins-community/tree/main/next-steps) 1.0.0（MIT）。這份改成卡片外觀、在每個標籤下顯示完整 prompt，並略過 subagent 的回合。

@@ -1,7 +1,7 @@
 {
   "name": "next-steps",
-  "version": "1.2.0",
-  "description": "After each turn, suggests up to three next prompts in a question card. Pick one (or type your own) and it becomes a draft to edit: in the terminal's prompt box, or in a field above the desktop app's.",
+  "version": "1.3.0",
+  "description": "After each turn, suggests up to three next prompts in a card above the input, drawn like the question card. Click one (or press 1, 2 or 3 in the terminal) to put it in the input box as a draft you can edit; 0 or the close mark dismisses.",
   "author": {
     "name": "Thariq Shihipar"
   },
