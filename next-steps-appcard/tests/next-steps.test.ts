@@ -35,14 +35,15 @@ const USAGE = {
   cache_creation_input_tokens: 0,
 }
 
-// `hasBox`: whether the session's prompt box takes a plugin's fill.
-type World = { surface: RenderSurface; hasBox: boolean }
+// `hasBox`: whether the session's prompt box takes a plugin's fill; `reply`:
+// what the fork answers, REPLY unless given.
+type World = { surface: RenderSurface; hasBox: boolean; reply?: string }
 
 type Sent = { fills: string[]; prompts: string[]; commands: string[]; forks: number; asks: number }
 
 // The world beneath the plugin: a fork that answers REPLY, one known command,
 // and a prompt box that takes a fill or does not.
-function world(on: On, { surface, hasBox }: World): Sent {
+function world(on: On, { surface, hasBox, reply = REPLY }: World): Sent {
   const sent: Sent = { fills: [], prompts: [], commands: [], forks: 0, asks: 0 }
   on('turn.start', (_$, e) => ({ turnId: e.turnId ?? 'turn-2' }))
   on('turn.complete', (_$, e) => ({ text: e.answer }))
@@ -53,7 +54,7 @@ function world(on: On, { surface, hasBox }: World): Sent {
   }))
   on('model.fork', () => {
     sent.forks += 1
-    return { value: { isAnswered: true, text: REPLY, usage: USAGE } }
+    return { value: { isAnswered: true, text: reply, usage: USAGE } }
   })
   // The engine's own question dialog: the card is drawn, never asked.
   on('tool.call', { tool: 'AskUserQuestion' }, () => {
@@ -96,9 +97,9 @@ for (const surface of ['terminal', 'desktop'] as const) {
 
     await $.turn.complete(TURN)
     await offered(ui)
-    // Collapsed: the title, the toggle and the close button, nothing to pick.
+    // Collapsed: the title, All, the toggle and the close button, nothing to pick.
     expect((await ui.findAll({ type: 'Text' })).map(text => text.text)).toEqual(['What next?'])
-    expect((await ui.findAll({ type: 'Button' })).map(button => button.key)).toEqual(['toggle', 'close'])
+    expect((await ui.findAll({ type: 'Button' })).map(button => button.key)).toEqual(['all', 'toggle', 'close'])
 
     await ui.press({ key: 'toggle' })
     // Expanded: label over prompt per suggestion. The command the session
@@ -109,6 +110,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
       '/code-review high',
     ])
     expect((await ui.findAll({ type: 'Button' })).map(button => button.key)).toEqual([
+      'all',
       'toggle',
       'close',
       'pick1',
@@ -144,6 +146,33 @@ test('the session keeps the last expand or collapse for its later cards', async 
   await ui.press({ key: 'toggle' })
   expect(await ui.find({ key: 'pick1' })).toBeUndefined()
   expect(await ui.find({ key: 'toggle' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('All fills the prompt box with every suggestion, one per line, even while collapsed', async ($, on) => {
+  const sent = world(on, { surface: 'desktop', hasBox: true })
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+
+  await $.turn.complete(TURN)
+  await offered(ui)
+  expect(await ui.find({ key: 'pick1' })).toBeUndefined()
+  expect((await ui.find({ key: 'all' }))?.props.label).toBe('All')
+
+  await ui.press({ key: 'all' })
+  expect(sent.fills).toEqual(['run the tests you just wrote\n/code-review high'])
+  expect(sent.prompts).toEqual([])
+  expect(await ui.find({ type: 'Button' })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('a single suggestion has no All', async ($, on) => {
+  const reply = JSON.stringify([{ label: 'Commit', prompt: 'commit it' }])
+  world(on, { surface: 'desktop', hasBox: true, reply })
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+
+  await $.turn.complete(TURN)
+  await offered(ui)
+  expect(await ui.find({ key: 'all' })).toBeUndefined()
   await ui.unmount()
 })
 

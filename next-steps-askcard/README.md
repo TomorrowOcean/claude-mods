@@ -41,7 +41,7 @@ Where a session has no input box a plugin can write, the draft opens in a field 
 After the turn the suggestions are drawn as a card above the input box, the one next-steps-appcard draws, and the transcript says so in one dim line:
 
 ```
-What next?                          ▾ ✕
+What next?                      All ▾ ✕
 ╭──────────────────────────────────────╮
 │ 1: Run the tests                     │
 │ run the tests you just wrote         │
@@ -52,7 +52,7 @@ What next?                          ▾ ✕
 ╰──────────────────────────────────────╯
 ```
 
-Click a suggestion's label (or press `1`, `2`, `3` in the terminal) to take it; `✕` closes the card. It starts collapsed to its title row: `▸` expands it and `▾` collapses it, and later cards in the same session open the way you left the last one. This card takes nothing over: ignore it and type as usual. In the terminal the top suggestion also shows as the input box's dim ghost text, so Tab takes it.
+Click a suggestion's label (or press `1`, `2`, `3` in the terminal) to take it, or `All` to put every suggestion in the input box at once, one per line (it shows when there are two or more, even while collapsed); `✕` closes the card. It starts collapsed to its title row: `▸` expands it and `▾` collapses it, and later cards in the same session open the way you left the last one. This card takes nothing over: ignore it and type as usual. In the terminal the top suggestion also shows as the input box's dim ghost text, so Tab takes it.
 
 ## When no card is raised at all
 

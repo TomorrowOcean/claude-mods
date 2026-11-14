@@ -5,7 +5,7 @@ After each turn, suggests up to three next prompts in a card above the input box
 Its sibling [next-steps-askcard](../next-steps-askcard/README.md) shows the same suggestions in the card Claude asks you questions with, and holds the turn open until you answer. Install one of the two, not both.
 
 ```
-What next?                          ▾ ✕
+What next?                      All ▾ ✕
 ╭──────────────────────────────────────╮
 │ 1: Run the tests                     │
 │ run the tests you just wrote         │
@@ -16,12 +16,12 @@ What next?                          ▾ ✕
 ╰──────────────────────────────────────╯
 ```
 
-Each small card is one suggestion: a short label you click (or press `1`, `2`, `3` in the terminal) over the prompt it stands for. Only the label is clickable. `✕` closes the card. It sits above the input box and takes nothing over: ignore it and type as usual.
+Each small card is one suggestion: a short label you click (or press `1`, `2`, `3` in the terminal) over the prompt it stands for. Only the label is clickable. `All` puts every suggestion in the input box at once, one per line, for you to edit and send; it shows when there are two or more, even while the card is collapsed. `✕` closes the card. It sits above the input box and takes nothing over: ignore it and type as usual.
 
 The card starts collapsed to its title row:
 
 ```
-What next?                          ▸ ✕
+What next?                      All ▸ ✕
 ```
 
 `▸` expands it and `▾` collapses it. Once you press either, later cards in the same session open the way you left the last one. A new session goes back to the `startCollapsed` option.

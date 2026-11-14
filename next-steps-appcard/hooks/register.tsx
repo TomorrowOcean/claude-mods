@@ -19,7 +19,8 @@
 // composer a plugin can write, the band shows a field holding the text
 // instead, sent by Enter or the send button as the person's own words
 // ($.prompt.submit asUser, or $.command.run for a "/skill arguments" prompt).
-// Nothing is sent until the person sends it. The top suggestion is also the
+// The title row's "All" takes every suggestion at once, one per line, as one
+// draft. Nothing is sent until the person sends it. The top suggestion is also the
 // composer's dim Tab-to-take ghost text ($.prompt.suggest).
 // The fork is also handed the session's skills and slash commands
 // ($.command.list), so a suggestion can be "/skill arguments".
@@ -36,8 +37,10 @@ type View =
   | Offer
   | { kind: 'review'; items: Suggestion[]; draft: string }
 
-// The card's own words: its title, and the glyphs on its two controls.
+// The card's own words: its title, the label that takes every suggestion at
+// once, and the glyphs on its two controls.
 const CARD_TITLE = 'What next?'
+const ALL_LABEL = 'All'
 const EXPAND_GLYPH = '▸'
 const COLLAPSE_GLYPH = '▾'
 const CLOSE_GLYPH = '✕'
@@ -320,6 +323,14 @@ export const register: Register = (on, options) => {
           <Box columnGap={1}>
             <Text bold>{CARD_TITLE}</Text>
             <Box flexGrow={1} />
+            {offer.items.length < 2 ? null : (
+              <Button
+                key="all"
+                plain
+                label={ALL_LABEL}
+                onPress={() => void draft($, offer, offer.items.map(item => item.prompt).join('\n'))}
+              />
+            )}
             <Button
               key="toggle"
               plain

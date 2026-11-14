@@ -27,7 +27,8 @@
 // whole and no blank rows (the band scrolls a tree taller than the rows it is
 // given, 12 in the desktop app). It starts collapsed to its
 // title row (the `startCollapsed` option), and the session keeps the person's
-// last expand or collapse. The top suggestion is then also the composer's dim
+// last expand or collapse. Its title row's "All" takes every suggestion at
+// once, one per line, as one draft. The top suggestion is then also the composer's dim
 // Tab-to-take ghost text ($.prompt.suggest).
 // The fork is also handed the session's skills and slash commands
 // ($.command.list), so a suggestion can be "/skill arguments".
@@ -62,7 +63,9 @@ const CARD_PASS = 'Not now'
 // A card closed sooner than this was never the person's to close: there is no
 // dialog here, and the band draws the card instead.
 const CARD_MIN_SHOWN_MS = 400
-// The glyphs on the band card's two controls.
+// The band card's label that takes every suggestion at once, and the glyphs
+// on its two controls.
+const ALL_LABEL = 'All'
 const EXPAND_GLYPH = '▸'
 const COLLAPSE_GLYPH = '▾'
 const CLOSE_GLYPH = '✕'
@@ -427,6 +430,14 @@ export const register: Register = (on, options) => {
           <Box columnGap={1}>
             <Text bold>{CARD_QUESTION}</Text>
             <Box flexGrow={1} />
+            {offer.items.length < 2 ? null : (
+              <Button
+                key="all"
+                plain
+                label={ALL_LABEL}
+                onPress={() => void draft($, offer, offer.items.map(item => item.prompt).join('\n'))}
+              />
+            )}
             <Button
               key="toggle"
               plain

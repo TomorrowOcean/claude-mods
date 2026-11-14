@@ -287,9 +287,9 @@ test('without the card the band draws one after the turn, collapsed, and an expa
   await $.classic.Stop(STOP)
   expect(await ui.find({ type: 'Button' })).toBeUndefined()
   await $.turn.complete(TURN)
-  // Collapsed: the title, the toggle and the close button, nothing to pick.
+  // Collapsed: the title, All, the toggle and the close button, nothing to pick.
   expect((await ui.findAll({ type: 'Text' })).map(text => text.text)).toEqual(['What next?'])
-  expect((await ui.findAll({ type: 'Button' })).map(button => button.key)).toEqual(['toggle', 'close'])
+  expect((await ui.findAll({ type: 'Button' })).map(button => button.key)).toEqual(['all', 'toggle', 'close'])
 
   await ui.press({ key: 'toggle' })
   // Expanded: label over prompt per suggestion.
@@ -299,6 +299,7 @@ test('without the card the band draws one after the turn, collapsed, and an expa
     '/code-review high',
   ])
   expect((await ui.findAll({ type: 'Button' })).map(button => button.key)).toEqual([
+    'all',
     'toggle',
     'close',
     'pick1',
@@ -308,6 +309,22 @@ test('without the card the band draws one after the turn, collapsed, and an expa
 
   await ui.press({ key: 'pick1' })
   expect(sent.fills).toEqual(['run the tests you just wrote'])
+  expect(sent.prompts).toEqual([])
+  expect(await ui.find({ type: 'Button' })).toBeUndefined()
+  await ui.unmount()
+})
+
+test("the band card's All fills the prompt box with every suggestion, one per line, even while collapsed", async ($, on) => {
+  const sent = world(on, { surface: 'desktop', hasCard: false })
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+
+  await $.classic.Stop(STOP)
+  await $.turn.complete(TURN)
+  expect(await ui.find({ key: 'pick1' })).toBeUndefined()
+  expect((await ui.find({ key: 'all' }))?.props.label).toBe('All')
+
+  await ui.press({ key: 'all' })
+  expect(sent.fills).toEqual(['run the tests you just wrote\n/code-review high'])
   expect(sent.prompts).toEqual([])
   expect(await ui.find({ type: 'Button' })).toBeUndefined()
   await ui.unmount()
